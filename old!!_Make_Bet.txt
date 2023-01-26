@@ -1,0 +1,386 @@
+from helium import *
+from Settings import *
+from selenium.webdriver.common.by import By
+import pandas as pd
+from Data_Structure_Name import *
+# import urllib.request, json
+import datetime as dt
+from fuzzywuzzy import fuzz
+import sys
+# from fuzzywuzzy import process
+
+# Calculates if the game is within the desired time range
+def time_difference(event_time, day_delta, max_diff):
+    today = dt.date.today()
+    tomorrow = today + dt.timedelta(days=day_delta)
+    match_time = dt.datetime.strptime(event_time, '%H:%M')
+    match_time_format = match_time.time()
+    match_time_date = dt.datetime.combine(tomorrow, match_time_format)
+    current_time = dt.datetime.now()
+    difference = match_time_date - current_time
+    difference_in_s = difference.total_seconds()
+
+    if difference_in_s <= max_diff:
+        return True
+    else:
+        return False
+
+
+# match team names
+def match_names(name, list_names, sport_id, list_id, min_score=0):
+    max_score = -1
+    max_name = -1
+    for x in list_names:
+        id_index = list_names.index(x)
+        compare = int(list_id[id_index])
+        # sportidstring = int(sporid)
+        if compare == sport_id:
+            score = fuzz.ratio(name, x)
+            if (score > min_score) & (score > max_score):
+                max_name = list_names.index(x)
+                max_score = score
+    return max_name
+
+
+# calculates percentage differential
+def calculate_diff(ai_value, tipp3_value):
+    diff = 0
+    if ai_value != 0 and tipp3_value != 0:
+        diff = round((tipp3_value - ai_value) / ai_value * 100, 2)
+        if diff < 0:
+            diff = 0
+    else:
+        return 0
+    return diff
+
+
+def calculate_double_chance(first_value, secound_vlaue):
+    odd = 0
+    if first_value != 0 and secound_vlaue != 0:
+        f_v = float(first_value)
+        s_v = float(secound_vlaue)
+        odd = (f_v*s_v)/(f_v+s_v)
+    else:
+        return 0
+    return odd
+
+# Get type of sport by searching for sublink of tipp 3 url. For  more accurate Team Name matching
+# sport_id only identifies if it is football, volleyball etc not the id of the individual event
+def identify_sport(url):
+    sub_url_list = ['xXXspace holderXXx', identifier_football, identifier_tennis, identifier_basketball,
+                    identifier_icehockey, identifier_volleyball, identifier_handball]
+
+    sport_id_comparer = -1
+    for index, filterItem in enumerate(sub_url_list):
+        subs = filterItem
+        if url.find(subs) != -1:
+            sport_id_comparer = index
+
+    return sport_id_comparer
+
+
+def make_bet(countine=None):
+    namematch_fail = 0
+    namematch_tried = 0
+    global_save_list = []
+    URL_list = []
+    name_failed = []
+
+    try:
+        # start Driver and read links to Dataframe
+        df = pd.read_csv(get_working_directory() + url_file_name)
+        current_url_list = df['Url'].values.tolist()
+
+        # go to each URL and get the betting data
+        for url in current_url_list:
+            try:
+                sport_id = identify_sport(url)
+                driver: object = start_firefox(headless=start_browser_headless)
+                go_to(url)
+
+                # Get Date
+                date_time = find_all(S('.t3-list-entry__date'))
+                date_time_list = [item.web_element.text for item in date_time]
+                splinter_list = []
+                for each_line in date_time_list:
+                    for splinter in each_line.split():
+                        splinter_list.append(splinter)
+                date_list = splinter_list[::2]
+                time_list = splinter_list[1::2]
+
+
+                # Get Event IDs
+                event_id_tags = driver.find_elements(By.CSS_SELECTOR, 'a.t3-list-entry__more-link')
+                event_list = []
+                for single_tag in event_id_tags:
+                    event_ID_string = single_tag.get_attribute('href')
+                    event_ID_nummeral = ''.join(filter(str.isdigit, event_ID_string))
+                    event_list.append(event_ID_nummeral)
+
+                # Get Teams and split them
+                teams = find_all(S('.t3-list-entry__player'))
+                team_list = [item.web_element.text for item in teams]
+                home_list = team_list[::2]
+                away_list = team_list[1::2]
+
+                if not team_list:
+                    continue
+
+                # Get liga
+                league = find_all(S('.t3-list-header__title-text'))
+                league_list = [item.web_element.text for item in league]
+
+                # Except if there ar any irregularity's
+                if len(home_list) != len(away_list)  or len(home_list) != len(date_list):
+                    print('unequal Data length, skipping current url')
+                    continue
+
+                if sport_id == -1:
+                    print('unidentified Sport')
+                    continue
+
+                if sport_id == 1:
+                    odd_football()
+
+                if sport_id == 2:
+
+                if sport_id == 3:
+
+                if sport_id == 4:
+
+                if sport_id == 5:
+
+                if sport_id == 6:
+
+
+
+                # eventdetails?eventID=2986236&caller=PRO
+
+                homeqoute, awayqoute, drawqoute = [], [], []
+
+                if sport_id_comparer == 1:
+
+                    # Get Quotes and split them accordingly to the type of bets
+                    qouten = driver.find_elements(By.CSS_SELECTOR, 'div.t3-list-entry__bet-group')
+                    qouten_valid = []
+                    for item in qouten:
+                        bettype = item.get_attribute('data-bettypekey')
+                        if bettype == 'TXT_BASICBET':
+                            qouten_valid.append(item.text)
+
+                    qouten_list = []
+                    for qoute in qouten_valid:
+                        for line in qoute.split('\n'):
+                        qouten_list.append(line)
+
+                    qoutesplit = len(qouten_list) / len(date_time)
+
+                    if qoutesplit == 3:
+                        homeqoute = qouten_list[::3]
+                        awayqoute = qouten_list[2::3]
+                        drawqoute = qouten_list[1::3]
+
+                if sport_id_comparer != 1:
+                    for singel_id in event_list:
+
+
+                # Get Index of all bets that are valid in the next 12h
+                index_list_games_in_time = []
+                only_one_check = False
+
+                for index in range(len(date_list)):
+                    if date_list[index] == 'heute':
+                        if not only_one_check:
+                            URL_list.append(i)
+                            only_one_check = True
+
+                        if time_difference(time_list[index], 0, time_filter):
+                            index_list_games_in_time.append(index)
+
+                    if date_list[index] == 'morgen':
+                        if not only_one_check:
+                            URL_list.append(i)
+                            only_one_check = True
+
+                        if time_difference(time_list[index], 1, time_filter):
+                            index_list_games_in_time.append(index)
+
+                # Match Ai and Tipp 3 Team Names using fuzzy logic
+                for filter_index in index_list_games_in_time:
+                    namematch_tried = namematch_tried + 1
+                    index_AI = -1
+
+                    team_name_home = home_list[filter_index]
+                    team_name_away = away_list[filter_index]
+                    if sport_id_comparer == 2:
+                        home_name_in_parts = []
+                        away_name_in_parts = []
+                        for line in team_name_home.split(','):
+                            home_name_in_parts.append(line)
+
+                        for line in team_name_away.split(','):
+                            away_name_in_parts.append(line)
+
+                        if len(home_name_in_parts) >= 2:
+                            team_name_home = home_name_in_parts[1] + home_name_in_parts[0]
+
+                        if len(away_name_in_parts) >= 2:
+                            team_name_away = away_name_in_parts[1] + away_name_in_parts[0]
+
+                    index_AI_home = match_names(team_name_home, ai_home_team, sport_id_comparer, ai_sport_id,
+                                                minimum_fuzzy_accuracy)
+                    if index_AI_home != -1:
+                        index_AI = index_AI_home
+                    else:
+                        index_AI_away = match_names(team_name_away, ai_away_team, sport_id_comparer, ai_sport_id,
+                                                    minimum_fuzzy_accuracy)
+                        if index_AI_away != -1:
+                            index_AI = index_AI_away
+
+                    if index_AI == -1:
+                        namematch_fail = namematch_fail+1
+                        name_failed.append(home_list[filter_index])
+                        continue
+
+                    h_q, d_q, a_q = homeqoute[filter_index], drawqoute[filter_index], awayqoute[filter_index]
+
+                    if not isinstance(h_q, int):
+                        h_q = float(h_q.replace(",", "."))
+                    if not isinstance(d_q, int):
+                        d_q = float(d_q.replace(",", "."))
+                    if not isinstance(a_q, int):
+                        a_q = float(a_q.replace(",", "."))
+
+                    diff_home = calculate_diff(float(ai_home_quote[index_AI]), h_q)
+                    diff_draw = calculate_diff(float(ai_draw_quote[index_AI]), d_q)
+                    diff_away = calculate_diff(float(ai_away_quote[index_AI]), a_q)
+
+                    # Save valid bets to Global List
+                    if diff_home > 0 or diff_draw > 0 or diff_away > 0:
+                        diff_home_or_draw, diff_no_draw, diff_away_or_draw = 0, 0, 0
+                        home_or_draw, no_draw, away_or_draw = 0, 0, 0
+                        ai_home_or_draw, ai_no_draw, ai_away_or_draw = 0, 0, 0
+
+                        # Go to website with all available bets if draws are possible
+                        if d_q > 0.5:
+
+                            # Go to special Link to get special bets
+                            event_id_string = str(event_list[filter_index])
+                            go_to(pro_dtails_url_part_1+event_id_string+pro_dtails_url_part_2)
+                            alternative_bet_items = find_all(S('.t3-list-detail'))
+                            alternative_bets = [item.web_element.text for item in alternative_bet_items]
+
+                            # find sting that contains the desired bet and split the string into parts
+                            double_chance_string_list = []
+                            for bet in alternative_bets:
+                                if 'Doppelte Chance\n1X' in bet:
+                                    for line in bet.split('\n'):
+                                        double_chance_string_list.append(line)
+
+                            if len(double_chance_string_list) == 7:
+                                # All double Chance bets available
+                                home_or_draw = double_chance_string_list[2]
+                                no_draw = double_chance_string_list[4]
+                                away_or_draw = double_chance_string_list[6]
+
+                            if len(double_chance_string_list) == 6:
+                                # First one missing
+                                if double_chance_string_list[2] == '12':
+                                    home_or_draw = 0
+                                    no_draw = double_chance_string_list[3]
+                                    away_or_draw = double_chance_string_list[5]
+
+                                # Second missing
+                                if double_chance_string_list[4] == 'X2':
+                                    home_or_draw = double_chance_string_list[2]
+                                    no_draw = 0
+                                    away_or_draw = double_chance_string_list[5]
+
+                                # Last one missing
+                                if double_chance_string_list[5] == 'X2':
+                                    home_or_draw = double_chance_string_list[2]
+                                    no_draw = double_chance_string_list[4]
+                                    away_or_draw = 0
+
+                            if len(double_chance_string_list) == 5:
+                                # first and second missing
+                                if double_chance_string_list[2] == '12' and double_chance_string_list[3] == 'X2':
+                                    home_or_draw = 0
+                                    no_draw = 0
+                                    away_or_draw = double_chance_string_list[4]
+
+                                # first and last missing
+                                if double_chance_string_list[2] == '12' and double_chance_string_list[4] == 'X2':
+                                    home_or_draw = 0
+                                    no_draw = double_chance_string_list[3]
+                                    away_or_draw = 0
+
+                                # second and last missing
+                                if double_chance_string_list[3] == '12':
+                                    home_or_draw = double_chance_string_list[2]
+                                    no_draw = 0
+                                    away_or_draw = 0
+
+                            if len(double_chance_string_list) == 4:
+                                home_or_draw = 0
+                                no_draw = 0
+                                away_or_draw = 0
+
+                            if not double_chance_string_list:
+                                home_or_draw = 0
+                                no_draw = 0
+                                away_or_draw = 0
+
+                            if not isinstance(home_or_draw, int):
+                                home_or_draw = float(home_or_draw.replace(",", "."))
+                            if not isinstance(no_draw, int):
+                                no_draw = float(no_draw.replace(",", "."))
+                            if not isinstance(away_or_draw, int):
+                                away_or_draw = float(away_or_draw.replace(",", "."))
+
+                            ai_home_or_draw = calculate_double_chance(ai_home_quote[index_AI], ai_draw_quote[index_AI])
+                            ai_no_draw = calculate_double_chance(ai_home_quote[index_AI], ai_away_quote[index_AI])
+                            ai_away_or_draw = calculate_double_chance(ai_away_quote[index_AI], ai_draw_quote[index_AI])
+
+                            diff_home_or_draw = calculate_diff(ai_home_or_draw, home_or_draw)
+                            diff_no_draw = calculate_diff(ai_no_draw, no_draw)
+                            diff_away_or_draw = calculate_diff(ai_away_or_draw, away_or_draw)
+
+                        value_list = [event_list[filter_index], league_list[0], home_list[filter_index], ai_home_team[index_AI], away_list[filter_index],
+                                      ai_away_team[index_AI], h_q, d_q, a_q, home_or_draw, no_draw, away_or_draw,
+                                      diff_home, diff_draw, diff_away, diff_home_or_draw, diff_no_draw,
+                                      diff_away_or_draw, ai_home_quote[index_AI], ai_draw_quote[index_AI],
+                                      ai_away_quote[index_AI], ai_home_or_draw, ai_no_draw, ai_away_or_draw]
+
+                        global_save_list.append(value_list)
+
+            except Exception as e:
+                print('Error while scraping Data:  ' + str(e))
+
+    except Exception as e:
+        print('Error while scraping Data:  '+str(e))
+
+    # Stopping Browser and write scrape.csv
+    try:
+        kill_browser()
+        df2 = pd.DataFrame(global_save_list, columns=['Event_Id', 'League', 'Home_Team', 'AI_Home_Team', 'Away_Team',
+                                                      'AI_Away_Team', 'Quote_Home', 'Quote_Draw', 'Quote_Away',
+                                                      'Quote_1X', 'Quote_12', 'Quote_2X', 'Diff_Home', 'Diff_Draw',
+                                                      'Diff_Away', 'Diff_1X', 'Diff_12', 'Diff_2X', 'Ai_Quote_Home',
+                                                      'Ai_Quote_Draw_AI', 'Ai_Quote_Away', 'Ai_Quote_1X', 'Ai_Quote_12',
+                                                      'Ai_Quote_2X'])
+
+        df2.to_csv(get_working_directory()+scrape_file_name, index=False)
+        df3 = pd.DataFrame(name_failed, columns=['name'])
+        df3.to_csv(get_working_directory() + '\\failed.csv', index=False)
+        if URL_list:
+            df3 = pd.DataFrame({'Url': URL_list})
+            df3.to_csv(get_working_directory() + url_file_name, index=False)
+        print(namematch_fail, namematch_tried)
+    except Exception as e:
+        print('Error writing scraping File:  ' + str(e))
+
+    return namematch_fail, namematch_tried
+
+
+# make_bet()
